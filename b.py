@@ -20,7 +20,7 @@ import requests
 from bs4 import BeautifulSoup as bs
 from urllib import parse
 
-# B站获取视频评论的接口，pn表示第几页，oid表示av号，type=1为视频评论，type=11为b博评论
+# B站获取视频评论的接口，pn表示第几页，oid表示av号，type=1为视频评论，type=11为b博评论，type=17为转发b博的评论
 REPLY_URL = 'https://api.bilibili.com/x/v2/reply?pn=%d&oid=%s&type=%d&sort=1'
 # B站获取B博oid的地址
 T_OID_URL = 'https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id=%s'
@@ -56,8 +56,12 @@ def get_aid_for_t(url):
     """
     tid = parse.urlparse(url).path.strip('/')
     r = requests.get(T_OID_URL % (tid))
-    aid = r.json()['data']['card']['desc']['rid']
-    return aid
+    t = r.json()['data']['card']['desc']['type']
+    if t == 2:
+        aid = r.json()['data']['card']['desc']['rid']
+    else:
+        aid = r.json()['data']['card']['desc']['dynamic_id_str']
+    return aid, t
 
 def get_uname_of_replies(aid, pn, t):
     """获取特定页的评论的人名（去重）
@@ -98,18 +102,19 @@ if __name__ == '__main__':
     account_list = []
     if 't.bilibili.com' in url:
         # 是b博，拿到b博的aid
-        aid = get_aid_for_t(url)
-        t = 11
+        aid, ta = get_aid_for_t(url)
+        if ta == 2:
+            t = 11
+        else:
+            t = 17
     else:
         # 是视频，拿到av号
         aid = get_aid(url)
         t = 1
     # 拿到总页数
     pages = get_pages_of_replies(aid, t)
-    print(pages)
     # 循环拿到所有评论者（去重）
     for i in range(1, pages+1):
-        print(i)
         unames = get_uname_of_replies(aid, i, t)
         # print(unames)
         for uname in unames:
